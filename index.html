@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能英文作文批改</title>
+    <!-- 引入Tailwind CSS框架 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入Lucide图标库 -->
+    <script src="https://unpkg.com/lucide-react@0.292.0/dist/lucide-react.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- 使用Inter字体，使页面更好看 -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* 自定义样式 */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* 定义批改结果中删除和添加的样式 */
+        .correction del {
+            text-decoration: line-through;
+            background-color: #fee2e2; /* 淡红色背景 */
+            color: #ef4444; /* 红色文字 */
+            padding: 2px 1px;
+            border-radius: 3px;
+        }
+        .correction ins {
+            text-decoration: none;
+            background-color: #dcfce7; /* 淡绿色背景 */
+            color: #22c55e; /* 绿色文字 */
+            padding: 2px 1px;
+            border-radius: 3px;
+            font-weight: 500;
+        }
+        /* 统一样式，用于水平和模型按钮的激活状态 */
+        .selectable-btn.active {
+            background-color: #2563eb; /* 激活状态的蓝色背景 */
+            color: white;
+            border-color: #2563eb;
+        }
+        /* 错误信息样式 */
+        .error-message {
+            color: #ef4444; /* 红色 */
+            background-color: #fee2e2;
+            border-left: 4px solid #ef4444;
+            padding: 1rem;
+            border-radius: 0.5rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-7xl">
+
+        <!-- 页面标题 -->
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">智能英文作文批改</h1>
+            <p class="mt-2 text-md text-gray-600">选择写作水平和批改模型，粘贴作文，AI将为您提供优化建议。</p>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- 左侧：输入区域 -->
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                <div class="mb-6">
+                    <label class="block text-lg font-semibold mb-3 text-gray-700">1. 选择写作水平</label>
+                    <div id="level-selector" class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <button class="selectable-btn level-btn w-full text-center p-3 border border-gray-300 rounded-lg hover:bg-gray-100 transition duration-200 active" data-level="初中">初中</button>
+                        <button class="selectable-btn level-btn w-full text-center p-3 border border-gray-300 rounded-lg hover:bg-gray-100 transition duration-200" data-level="高中">高中</button>
+                        <button class="selectable-btn level-btn w-full text-center p-3 border border-gray-300 rounded-lg hover:bg-gray-100 transition duration-200" data-level="PET">PET</button>
+                        <button class="selectable-btn level-btn w-full text-center p-3 border border-gray-300 rounded-lg hover:bg-gray-100 transition duration-200" data-level="FCE">FCE</button>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <label class="block text-lg font-semibold mb-3 text-gray-700">2. 选择批改模型</label>
+                    <div id="model-selector" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <button class="selectable-btn model-btn w-full text-center p-3 border border-gray-300 rounded-lg hover:bg-gray-100 transition duration-200 active" data-model="Deepseek">Deepseek</button>
+                        <button class="selectable-btn model-btn w-full text-center p-3 border border-gray-300 rounded-lg hover:bg-gray-100 transition duration-200" data-model="通义千问">通义千问</button>
+                        <button class="selectable-btn model-btn w-full text-center p-3 border border-gray-300 rounded-lg hover:bg-gray-100 transition duration-200" data-model="豆包">豆包</button>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <label for="essay-input" class="block text-lg font-semibold mb-3 text-gray-700">3. 粘贴作文内容</label>
+                    <textarea id="essay-input" rows="15" class="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200" placeholder="请在此处粘贴您的英文作文..."></textarea>
+                </div>
+
+                <button id="submit-btn" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition duration-200 flex items-center justify-center gap-2">
+                    <svg id="submit-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>
+                    <span id="submit-text">开始批改</span>
+                    <svg id="loading-spinner" class="animate-spin -ml-1 mr-3 h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- 右侧：批改结果 -->
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                <h2 class="text-lg font-semibold mb-3 text-gray-700">查看批改结果</h2>
+                <div id="result-output" class="w-full h-full min-h-[400px] p-4 border border-gray-200 rounded-lg bg-gray-50 overflow-y-auto">
+                    <div id="placeholder" class="flex flex-col items-center justify-center h-full text-gray-500">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-check-2 mb-4"><path d="M4 22h14a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v4"/><path d="M14 2v6h6"/><path d="m3 15 2 2 4-4"/></svg>
+                        <p class="text-center">批改结果将显示在这里</p>
+                    </div>
+                    <div id="correction-result" class="correction text-lg leading-relaxed"></div>
+                </div>
+            </div>
+        </main>
+
+    </div>
+
+    <script>
+        // 获取页面上的元素
+        const levelButtons = document.querySelectorAll('.level-btn');
+        const modelButtons = document.querySelectorAll('.model-btn');
+        const essayInput = document.getElementById('essay-input');
+        const submitBtn = document.getElementById('submit-btn');
+        const submitText = document.getElementById('submit-text');
+        const submitIcon = document.getElementById('submit-icon');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const placeholder = document.getElementById('placeholder');
+        const correctionResult = document.getElementById('correction-result');
+        
+        // 默认值
+        let selectedLevel = '初中'; 
+        let selectedModel = 'Deepseek';
+
+        // 水平选择按钮的点击事件
+        levelButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                levelButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                selectedLevel = button.dataset.level;
+            });
+        });
+        
+        // 模型选择按钮的点击事件
+        modelButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                modelButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                selectedModel = button.dataset.model;
+            });
+        });
+
+        // 提交按钮的点击事件 - 已更新为调用流式API
+        submitBtn.addEventListener('click', async () => {
+            const essayText = essayInput.value;
+            if (essayText.trim() === '') {
+                alert('请输入作文内容！');
+                return;
+            }
+
+            // 1. 更新UI为加载状态
+            submitText.textContent = '批改中...';
+            submitIcon.classList.add('hidden');
+            loadingSpinner.classList.remove('hidden');
+            submitBtn.disabled = true;
+
+            placeholder.classList.add('hidden');
+            correctionResult.innerHTML = ''; // 清空上次结果
+            correctionResult.classList.remove('hidden');
+
+
+            // 2. 准备API请求
+            const apiUrl = 'https://api.coze.cn/v1/workflow/stream_run';
+            const apiKey = 'pat_3apFUVQ7iimUQK9Sjb56sqyxwaKUXr4YWLLnEbk3QrPU1dzgYZ5lVnZ07eFMhk7x';
+            
+            const prompt = `请以'${selectedLevel}'学生的水平, 使用'${selectedModel}'模型来批改以下英文作文。要求：
+1.  直接在原文上修改，使用 <del>删除的文字</del> 和 <ins>新增的文字</ins> 标签来标记改动。
+2.  在文章末尾，请给出一个综合性的评价和一些具体的改进建议。
+
+作文内容如下：
+---
+${essayText}`;
+
+            const payload = {
+                parameters: {
+                    content: prompt
+                },
+                workflow_id: "7514618628429168655"
+            };
+
+            try {
+                // 3. 发送API请求
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`API请求失败: ${response.status} ${response.statusText}. ${errorData.msg || ''}`);
+                }
+
+                // 4. 处理流式响应
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) {
+                        break;
+                    }
+                    
+                    buffer += decoder.decode(value, { stream: true });
+                    
+                    // 按双换行符分割消息
+                    const messages = buffer.split('\n\n');
+                    buffer = messages.pop(); //最后一个可能不完整，放回缓冲区
+
+                    for (const message of messages) {
+                        if (message.startsWith('data:')) {
+                            const jsonString = message.substring(6).trim();
+                            if (jsonString) {
+                                try {
+                                    const dataObj = JSON.parse(jsonString);
+                                    if (dataObj.content) {
+                                        // 将换行符替换为<br>并追加到结果中
+                                        correctionResult.innerHTML += dataObj.content.replace(/\n/g, '<br>');
+                                    }
+                                } catch (e) {
+                                    console.error('JSON parsing error:', e, 'on string:', jsonString);
+                                }
+                            }
+                        }
+                    }
+                }
+
+            } catch (error) {
+                // 5. 错误处理
+                console.error('批改过程中发生错误:', error);
+                correctionResult.innerHTML = `<div class="error-message"><strong>出错了！</strong><br>${error.message}</div>`;
+            } finally {
+                // 6. 恢复UI状态
+                submitText.textContent = '重新批改';
+                submitIcon.classList.remove('hidden');
+                loadingSpinner.classList.add('hidden');
+                submitBtn.disabled = false;
+            }
+        });
+        
+        // 为输入框设置一个示例，方便测试
+        essayInput.value = "My name is Li Hua. I is a student from China. Yesterday, I buy a apple. It was very good. I am very happy.";
+
+    </script>
+</body>
+</html>
