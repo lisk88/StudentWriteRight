@@ -6,6 +6,8 @@
     <title>智能英文作文批改</title>
     <!-- 引入Tailwind CSS框架 -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入Marked.js用于解析Markdown -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <!-- 引入Lucide图标库 -->
     <script src="https://unpkg.com/lucide-react@0.292.0/dist/lucide-react.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -17,15 +19,35 @@
         body {
             font-family: 'Inter', sans-serif;
         }
-        /* 定义批改结果中删除和添加的样式 */
-        .correction del {
+        /* Markdown渲染结果的样式优化 */
+        .correction-content h1, .correction-content h2, .correction-content h3 {
+            font-weight: 700;
+            margin-top: 1.5rem;
+            margin-bottom: 0.5rem;
+            line-height: 1.2;
+        }
+        .correction-content h1 { font-size: 1.875rem; }
+        .correction-content h2 { font-size: 1.5rem; }
+        .correction-content h3 { font-size: 1.25rem; }
+        .correction-content p {
+            margin-bottom: 1rem;
+        }
+        .correction-content ul, .correction-content ol {
+            margin-left: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .correction-content ul { list-style-type: disc; }
+        .correction-content ol { list-style-type: decimal; }
+        .correction-content li { margin-bottom: 0.25rem; }
+        .correction-content strong { font-weight: 600; }
+        .correction-content del {
             text-decoration: line-through;
             background-color: #fee2e2; /* 淡红色背景 */
             color: #ef4444; /* 红色文字 */
             padding: 2px 1px;
             border-radius: 3px;
         }
-        .correction ins {
+        .correction-content ins {
             text-decoration: none;
             background-color: #dcfce7; /* 淡绿色背景 */
             color: #22c55e; /* 绿色文字 */
@@ -104,7 +126,7 @@
                          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-check-2 mb-4"><path d="M4 22h14a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v4"/><path d="M14 2v6h6"/><path d="m3 15 2 2 4-4"/></svg>
                         <p class="text-center">批改结果将显示在这里</p>
                     </div>
-                    <div id="correction-result" class="correction text-lg leading-relaxed"></div>
+                    <div id="correction-result" class="correction-content text-lg leading-relaxed"></div>
                 </div>
             </div>
         </main>
@@ -145,7 +167,7 @@
             });
         });
 
-        // 提交按钮的点击事件 - 已更新为调用流式API
+        // 提交按钮的点击事件 - 已更新为调用流式API并解析Markdown
         submitBtn.addEventListener('click', async () => {
             const essayText = essayInput.value;
             if (essayText.trim() === '') {
@@ -169,8 +191,9 @@
             const apiKey = 'pat_3apFUVQ7iimUQK9Sjb56sqyxwaKUXr4YWLLnEbk3QrPU1dzgYZ5lVnZ07eFMhk7x';
             
             const prompt = `请以'${selectedLevel}'学生的水平, 使用'${selectedModel}'模型来批改以下英文作文。要求：
-1.  直接在原文上修改，使用 <del>删除的文字</del> 和 <ins>新增的文字</ins> 标签来标记改动。
-2.  在文章末尾，请给出一个综合性的评价和一些具体的改进建议。
+1.  以Markdown格式返回结果。
+2.  在原文上直接修改，使用 ~~删除的文字~~ 和 **新增的文字** 来标记改动。
+3.  在文章末尾，请给出一个综合性的评价和一些具体的改进建议，使用Markdown标题和列表。
 
 作文内容如下：
 ---
@@ -199,10 +222,11 @@ ${essayText}`;
                     throw new Error(`API请求失败: ${response.status} ${response.statusText}. ${errorData.msg || ''}`);
                 }
 
-                // 4. 处理流式响应
+                // 4. 处理流式响应 (已更新为解析Markdown)
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let buffer = '';
+                let fullMarkdownContent = ''; // 用于存储所有收到的Markdown内容
 
                 while (true) {
                     const { done, value } = await reader.read();
@@ -212,27 +236,34 @@ ${essayText}`;
                     
                     buffer += decoder.decode(value, { stream: true });
                     
-                    // 按双换行符分割消息
-                    const messages = buffer.split('\n\n');
-                    buffer = messages.pop(); //最后一个可能不完整，放回缓冲区
+                    let boundary;
+                    while ((boundary = buffer.indexOf('\n\n')) !== -1) {
+                        const messageBlock = buffer.substring(0, boundary);
+                        buffer = buffer.substring(boundary + 2);
 
-                    for (const message of messages) {
-                        if (message.startsWith('data:')) {
-                            const jsonString = message.substring(6).trim();
-                            if (jsonString) {
-                                try {
-                                    const dataObj = JSON.parse(jsonString);
-                                    if (dataObj.content) {
-                                        // 将换行符替换为<br>并追加到结果中
-                                        correctionResult.innerHTML += dataObj.content.replace(/\n/g, '<br>');
+                        const lines = messageBlock.split('\n');
+                        for (const line of lines) {
+                            if (line.startsWith('data:')) {
+                                const jsonString = line.substring(6).trim();
+                                if (jsonString) {
+                                    try {
+                                        const dataObj = JSON.parse(jsonString);
+                                        if (dataObj.content) {
+                                            fullMarkdownContent += dataObj.content;
+                                        }
+                                    } catch (e) {
+                                        console.error('JSON解析错误:', e, '原始字符串:', jsonString);
                                     }
-                                } catch (e) {
-                                    console.error('JSON parsing error:', e, 'on string:', jsonString);
                                 }
                             }
                         }
                     }
+                    // 实时解析并渲染完整的Markdown内容
+                    correctionResult.innerHTML = marked.parse(fullMarkdownContent);
                 }
+                 // 确保最后缓冲区里剩余的内容也被解析
+                 correctionResult.innerHTML = marked.parse(fullMarkdownContent);
+
 
             } catch (error) {
                 // 5. 错误处理
