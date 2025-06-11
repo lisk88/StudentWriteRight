@@ -121,7 +121,8 @@
             <!-- 右侧：批改结果 -->
             <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                 <h2 class="text-lg font-semibold mb-3 text-gray-700">查看批改结果</h2>
-                <div id="result-output" class="w-full h-full min-h-[400px] p-4 border border-gray-200 rounded-lg bg-gray-50 overflow-y-auto">
+                <!-- 更新：为结果区域添加防止水平滚动和强制换行的class -->
+                <div id="result-output" class="w-full h-full min-h-[400px] p-4 border border-gray-200 rounded-lg bg-gray-50 overflow-y-auto overflow-x-hidden break-words">
                     <div id="placeholder" class="flex flex-col items-center justify-center h-full text-gray-500">
                          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-check-2 mb-4"><path d="M4 22h14a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v4"/><path d="M14 2v6h6"/><path d="m3 15 2 2 4-4"/></svg>
                         <p class="text-center">批改结果将显示在这里</p>
@@ -167,7 +168,7 @@
             });
         });
 
-        // 提交按钮的点击事件 - 已更新为调用流式API并解析Markdown
+        // 提交按钮的点击事件
         submitBtn.addEventListener('click', async () => {
             const essayText = essayInput.value;
             if (essayText.trim() === '') {
@@ -199,12 +200,22 @@
 ---
 ${essayText}`;
 
+            const modelTypeMap = {
+                '豆包': 0,
+                'Deepseek': 1,
+                '通义千问': 2
+            };
+            const typeValue = modelTypeMap[selectedModel];
+
             const payload = {
                 parameters: {
-                    content: prompt
+                    content: prompt,
+                    type: typeValue
                 },
                 workflow_id: "7514618628429168655"
             };
+            
+            console.log("发送的请求体:", JSON.stringify(payload));
 
             try {
                 // 3. 发送API请求
@@ -222,11 +233,11 @@ ${essayText}`;
                     throw new Error(`API请求失败: ${response.status} ${response.statusText}. ${errorData.msg || ''}`);
                 }
 
-                // 4. 处理流式响应 (已更新为解析Markdown)
+                // 4. 处理流式响应
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let buffer = '';
-                let fullMarkdownContent = ''; // 用于存储所有收到的Markdown内容
+                let fullMarkdownContent = ''; 
 
                 while (true) {
                     const { done, value } = await reader.read();
@@ -258,11 +269,11 @@ ${essayText}`;
                             }
                         }
                     }
-                    // 实时解析并渲染完整的Markdown内容
-                    correctionResult.innerHTML = marked.parse(fullMarkdownContent);
+                    // 更新：添加 breaks: true 选项以支持换行
+                    correctionResult.innerHTML = marked.parse(fullMarkdownContent, { breaks: true });
                 }
                  // 确保最后缓冲区里剩余的内容也被解析
-                 correctionResult.innerHTML = marked.parse(fullMarkdownContent);
+                 correctionResult.innerHTML = marked.parse(fullMarkdownContent, { breaks: true });
 
 
             } catch (error) {
